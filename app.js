@@ -29,18 +29,18 @@ const initializeDbAndServer = async () => {
 
 initializeDbAndServer();
 
+const hasPriorityAndStatusProperties = (requestQuery) => {
+  return (
+    requestQuery.priority !== undefined && requestQuery.status !== undefined
+  );
+};
+
 const hasPriorityProperty = (requestQuery) => {
   return requestQuery.priority !== undefined;
 };
 
 const hasStatusProperty = (requestQuery) => {
   return requestQuery.status !== undefined;
-};
-
-const hasStatusAndPriorityProperty = (requestQuery) => {
-  return (
-    requestQuery.status !== undefined && requestQuery.priority !== undefined
-  );
 };
 
 //Returns a list of all todos whose status is 'TO DO'
@@ -126,50 +126,45 @@ app.post("/todos/", async (request, response) => {
 //Updates the details of a specific todo based on the todo ID
 app.put("/todos/:todoId/", async (request, response) => {
   const { todoId } = request.params;
-  let updateTodoQuery = "";
+
+  let updateColumn = "";
   const requestBody = request.body;
+
   switch (true) {
     case requestBody.status !== undefined:
-        updateTodoQuery = `
-        UPDATE
-            todo
-        SET
-            status = '${status}'
-        WHERE
-            id = ${todoId};
-        `;
-        await database.run(updateTodoQuery);
-        response.send("Status Updated");
-        break;
-
+      updateColumn = "Status";
+      break;
     case requestBody.priority !== undefined:
-        updateTodoQuery = `
-        UPDATE
-            todo
-        SET
-            priority = '${priority}'
-        WHERE
-            id = ${todoId};
-        `;
-        await database.run(updateTodoQuery);
-        response.send("Priority Updated");
-        break;
-
+      updateColumn = "Priority";
+      break;
     case requestBody.todo !== undefined:
-        updateTodoQuery = `
-        UPDATE
-            todo
-        SET
-            todo = '${todo}'
-        WHERE
-            id = ${todoId};
-        `;
-        await database.run(updateTodoQuery);
-        response.send("Todo Updated");
-        break;
-    
+      updateColumn = "Todo";
+      break;
   }
 
+  const previousTodoQuery = `
+  SELECT * FROM todo where id = ${todoId};`;
+  const previousTodo = await database.get(previousTodoQuery);
+
+  const {
+    todo = previousTodo.todo,
+    status = previousTodo.status,
+    priority = previousTodo.priority,
+  } = request.body;
+
+  const updateTodoQuery = `
+    UPDATE
+      todo
+    SET
+      todo='${todo}',
+      priority='${priority}',
+      status='${status}'
+    WHERE
+      id = ${todoId};`;
+
+  await database.run(updateTodoQuery);
+  response.send(`${updateColumn} Updated`);
+});
 
 //Delete a Todo based on Id
 app.delete("/todos/:todoId/", async (request, response) => {
